@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Shield, 
   Zap, 
@@ -12,10 +12,281 @@ import {
   Users,
   Star,
   Download,
-  RefreshCw
+  RefreshCw,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 
+type Step = 'landing' | 'email-form' | 'otp-verification' | 'email-analysis';
+
+interface FormData {
+  email: string;
+  otp: string;
+}
+
 function App() {
+  const [currentStep, setCurrentStep] = useState<Step>('landing');
+  const [formData, setFormData] = useState<FormData>({ email: '', otp: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [generatedOTP, setGeneratedOTP] = useState('');
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const generateOTP = (): string => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (!validateEmail(formData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setLoading(true);
+    
+    // Simulate OTP generation and sending
+    const otp = generateOTP();
+    setGeneratedOTP(otp);
+    
+    // Simulate API call delay
+    setTimeout(() => {
+      setLoading(false);
+      setCurrentStep('otp-verification');
+      // In a real app, you would send the OTP via email service
+      console.log(`OTP sent to ${formData.email}: ${otp}`);
+    }, 2000);
+  };
+
+  const handleOTPSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (formData.otp !== generatedOTP) {
+      setError('Invalid OTP. Please check your email and try again.');
+      return;
+    }
+
+    setLoading(true);
+    
+    // Simulate verification delay
+    setTimeout(() => {
+      setLoading(false);
+      setCurrentStep('email-analysis');
+    }, 1000);
+  };
+
+  const handleAnalyzeClick = () => {
+    setCurrentStep('email-form');
+  };
+
+  const renderEmailForm = () => (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <Shield className="h-8 w-8 text-blue-600" />
+            <span className="text-2xl font-bold text-gray-900">SpamGuard Pro</span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Verify Your Email</h2>
+          <p className="text-gray-600">Enter your email address to receive a verification code</p>
+        </div>
+
+        <form onSubmit={handleEmailSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              Email Address
+            </label>
+            <input
+              type="email"
+              id="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter your email address"
+              required
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
+              <AlertCircle className="h-5 w-5" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                Sending Verification Code...
+              </>
+            ) : (
+              'Send Verification Code'
+            )}
+          </button>
+        </form>
+
+        <button
+          onClick={() => setCurrentStep('landing')}
+          className="w-full mt-4 text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          ← Back to Home
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderOTPVerification = () => (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <Shield className="h-8 w-8 text-blue-600" />
+            <span className="text-2xl font-bold text-gray-900">SpamGuard Pro</span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Enter Verification Code</h2>
+          <p className="text-gray-600">
+            We've sent a 6-digit code to <br />
+            <span className="font-semibold">{formData.email}</span>
+          </p>
+        </div>
+
+        <form onSubmit={handleOTPSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
+              Verification Code
+            </label>
+            <input
+              type="text"
+              id="otp"
+              value={formData.otp}
+              onChange={(e) => setFormData({ ...formData, otp: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl font-mono tracking-widest"
+              placeholder="000000"
+              maxLength={6}
+              required
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
+              <AlertCircle className="h-5 w-5" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading || formData.otp.length !== 6}
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                Verifying...
+              </>
+            ) : (
+              'Verify Code'
+            )}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => {
+              const newOTP = generateOTP();
+              setGeneratedOTP(newOTP);
+              console.log(`New OTP sent to ${formData.email}: ${newOTP}`);
+            }}
+            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+          >
+            Didn't receive the code? Resend
+          </button>
+        </div>
+
+        <button
+          onClick={() => setCurrentStep('email-form')}
+          className="w-full mt-4 text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          ← Change Email Address
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderEmailAnalysis = () => (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-4">
+      <div className="max-w-4xl w-full bg-white rounded-2xl shadow-xl p-8">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <Shield className="h-8 w-8 text-blue-600" />
+            <span className="text-2xl font-bold text-gray-900">SpamGuard Pro</span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Email Analysis Dashboard</h2>
+          <p className="text-gray-600">Welcome! You now have access to our AI-powered email analysis tools.</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Paste Your Email Content</h3>
+            <textarea
+              className="w-full h-40 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              placeholder="Paste your email content here for analysis..."
+            />
+            <button className="w-full mt-4 bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+              Analyze Email
+            </button>
+          </div>
+
+          <div className="bg-white border-2 border-gray-200 p-6 rounded-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Analysis Results</h3>
+            <div className="text-center text-gray-500 py-8">
+              <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <p>Paste your email content and click "Analyze Email" to see results</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => {
+              setCurrentStep('landing');
+              setFormData({ email: '', otp: '' });
+              setGeneratedOTP('');
+              setError('');
+            }}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            ← Back to Home
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (currentStep === 'email-form') {
+    return renderEmailForm();
+  }
+
+  if (currentStep === 'otp-verification') {
+    return renderOTPVerification();
+  }
+
+  if (currentStep === 'email-analysis') {
+    return renderEmailAnalysis();
+  }
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -24,10 +295,13 @@ function App() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
               <Shield className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">InboxGuard</span>
+              <span className="text-2xl font-bold text-gray-900">SpamGuard Pro</span>
             </div>
-            <button className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-              Start Free Trial
+            <button 
+              onClick={handleAnalyzeClick}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              Analyze your Email
             </button>
           </div>
         </div>
@@ -53,18 +327,13 @@ function App() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <button className="bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center group">
+              <button 
+                onClick={handleAnalyzeClick}
+                className="bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center group"
+              >
                 Transform Your Emails Now
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </button>
-              <button className="text-gray-600 px-8 py-4 rounded-xl font-semibold text-lg hover:text-gray-900 transition-colors flex items-center">
-                <BarChart3 className="mr-2 h-5 w-5" />
-                View Demo
-              </button>
-            </div>
-
-            <div className="mt-12 text-sm text-gray-500">
-              ✓ No credit card required • ✓ Free 7-day trial • ✓ Setup in 30 seconds
             </div>
           </div>
         </div>
@@ -132,7 +401,7 @@ function App() {
               </h2>
               
               <p className="text-xl text-gray-600 mb-8">
-                Unlike basic spam detectors, InboxGuard actively transforms your risky emails into professional, 
+                Unlike basic spam detectors, SpamGuard Pro actively transforms your risky emails into professional, 
                 inbox-ready messages using advanced AI technology.
               </p>
 
@@ -366,27 +635,30 @@ function App() {
             Ready to Never Lose Another Email to Spam?
           </h2>
           <p className="text-xl text-gray-600 mb-8">
-            Join thousands of professionals who've transformed their email success with InboxGuard.
+            Join thousands of professionals who've transformed their email success with SpamGuard Pro.
           </p>
           
           <div className="bg-white p-8 rounded-2xl shadow-lg inline-block">
             <div className="mb-6">
-              <div className="text-4xl font-bold text-gray-900 mb-2">Free Trial</div>
-              <div className="text-gray-600">No credit card required • Cancel anytime</div>
+              <div className="text-4xl font-bold text-gray-900 mb-2">Get Started</div>
+              <div className="text-gray-600">Secure email verification required</div>
             </div>
             
-            <button className="bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center mx-auto group mb-4">
+            <button 
+              onClick={handleAnalyzeClick}
+              className="bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center mx-auto group mb-4"
+            >
               Start Optimizing Your Emails Now
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </button>
             
             <div className="text-sm text-gray-500">
-              ✓ 7-day free trial • ✓ Full access to all features • ✓ No setup fees
+              ✓ Secure email verification • ✓ Full access to all features • ✓ Professional results
             </div>
           </div>
 
           <div className="mt-12 text-gray-500 text-sm">
-            Over 2,500 professionals trust InboxGuard to deliver their most important emails.
+            Over 2,500 professionals trust SpamGuard Pro to deliver their most important emails.
           </div>
         </div>
       </section>
@@ -398,7 +670,7 @@ function App() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <Shield className="h-8 w-8 text-blue-400" />
-                <span className="text-2xl font-bold">InboxGuard</span>
+                <span className="text-2xl font-bold">SpamGuard Pro</span>
               </div>
               <p className="text-gray-400">
                 AI-powered email optimization that ensures your messages reach every inbox.
@@ -434,7 +706,7 @@ function App() {
           </div>
           
           <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 InboxGuard. All rights reserved.</p>
+            <p>&copy; 2025 SpamGuard Pro. All rights reserved.</p>
           </div>
         </div>
       </footer>
