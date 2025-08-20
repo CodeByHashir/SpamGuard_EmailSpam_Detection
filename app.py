@@ -34,10 +34,16 @@ def _get_recommendation(result):
 
 # Initialize the email filtering system
 try:
+    # Get API key from environment variable for security
+    gemini_api_key = os.getenv('GEMINI_API_KEY')
+    if not gemini_api_key:
+        logger.error("GEMINI_API_KEY environment variable not set!")
+        return jsonify({"error": "API key not configured"}), 500
+    
     # Use your trained model
     system = EmailFilteringSystem(
         model_path="best_logreg_tfidf.joblib",
-        gemini_api_key="AIzaSyD4X0MdgUmLjBCL5_89HoqYWAmL4vXU9XA"
+        gemini_api_key=gemini_api_key
     )
     logger.info("Email filtering system initialized successfully")
 except Exception as e:

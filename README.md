@@ -67,8 +67,13 @@ cd SpamGuard_EmailSpam_Detection
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Set your Gemini API key
-export GEMINI_API_KEY="your_api_key_here"
+# Set your Gemini API key (IMPORTANT: Never commit your actual API key!)
+# Option 1: Environment variable
+export GEMINI_API_KEY="your_actual_api_key_here"
+
+# Option 2: Create .env file (copy from env.example)
+cp env.example .env
+# Then edit .env and add your actual API key
 
 # Start the Flask server
 python app.py
@@ -228,6 +233,32 @@ SpamGuard_EmailSpam_Detection/
 5. Open a Pull Request
 
 ## 🔒 **Security & Privacy**
+
+### **API Key Security**
+⚠️ **IMPORTANT**: Never commit your actual API keys to Git!
+
+1. **Use Environment Variables**:
+   ```bash
+   export GEMINI_API_KEY="your_actual_api_key"
+   ```
+
+2. **Use .env File** (recommended for development):
+   ```bash
+   cp env.example .env
+   # Edit .env and add your actual API key
+   ```
+
+3. **Production Deployment**: Set environment variables in your hosting platform
+   - Vercel: Project Settings → Environment Variables
+   - Railway: Variables tab
+   - Render: Environment section
+
+### **Security Best Practices**
+- ✅ API keys are stored in environment variables
+- ✅ `.env` files are excluded from Git (in .gitignore)
+- ✅ No hardcoded secrets in source code
+- ✅ Secure session management
+- ✅ Input validation and sanitization
 
 ### **Data Protection**
 - **No email storage**: Emails are processed in-memory only
