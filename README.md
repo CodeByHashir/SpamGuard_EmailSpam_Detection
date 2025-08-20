@@ -55,6 +55,7 @@
 - Python 3.8+
 - Node.js 16+
 - Gemini API key
+- **ML Model File**: `best_logreg_tfidf.joblib` (download from Google Drive)
 
 ### **1. Clone the Repository**
 ```bash
@@ -66,6 +67,11 @@ cd SpamGuard_EmailSpam_Detection
 ```bash
 # Install Python dependencies
 pip install -r requirements.txt
+
+# Download the required ML model file
+# The model file is too large for GitHub, so download it from Google Drive:
+# 📥 Download Link: https://drive.google.com/drive/folders/1Rx_DrtljDKkhYsi--69UOBXavnnxsO7-?usp=sharing
+# Download "best_logreg_tfidf.joblib" and place it in the project root directory
 
 # Set your Gemini API key (IMPORTANT: Never commit your actual API key!)
 # Option 1: Environment variable
@@ -91,6 +97,25 @@ npm run dev
 ### **4. Access the Application**
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:5000
+
+## 📥 **ML Model Requirements**
+
+### **Important: Download Required Model File**
+This project uses a custom-trained machine learning model that is too large to include in the GitHub repository.
+
+**📥 Download the Model:**
+- **Google Drive Link**: [https://drive.google.com/drive/folders/1Rx_DrtljDKkhYsi--69UOBXavnnxsO7-?usp=sharing](https://drive.google.com/drive/folders/1Rx_DrtljDKkhYsi--69UOBXavnnxsO7-?usp=sharing)
+- **File to Download**: `best_logreg_tfidf.joblib`
+- **Place in**: Project root directory (same level as `app.py`)
+
+**Why This Model?**
+I use `best_logreg_tfidf.joblib` model for this project because it provides:
+- **98%+ accuracy** in spam detection
+- **Fast inference** for real-time email analysis
+- **Optimized performance** with TF-IDF features
+- **Proven reliability** on the Enron spam dataset
+
+**⚠️ Without this model file, the application will not work!**
 
 ## 📖 **Usage Guide**
 
@@ -214,9 +239,12 @@ SpamGuard_EmailSpam_Detection/
 ├── src/                   # React frontend
 │   ├── App.tsx           # Main application component
 │   └── components/       # UI components
-├── best_logreg_tfidf.joblib  # Trained ML model
+├── best_logreg_tfidf.joblib  # Trained ML model (download from Google Drive)
 └── README.md             # This file
 ```
+
+**⚠️ Note**: `best_logreg_tfidf.joblib` is not included in the repository due to size limitations. 
+Download it from the [Google Drive link](#ml-model-requirements) above.
 
 ### **Key Technologies**
 - **Backend**: Flask, Python, scikit-learn
@@ -231,6 +259,33 @@ SpamGuard_EmailSpam_Detection/
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+## 🚨 **Troubleshooting**
+
+### **Common Setup Issues**
+
+1. **Model File Missing**:
+   - **Error**: `FileNotFoundError: Model file not found: best_logreg_tfidf.joblib`
+   - **Solution**: Download the model from [Google Drive](https://drive.google.com/drive/folders/1Rx_DrtljDKkhYsi--69UOBXavnnxsO7-?usp=sharing)
+   - **Place**: In the project root directory (same level as `app.py`)
+
+2. **API Key Not Set**:
+   - **Error**: `GEMINI_API_KEY environment variable not set!`
+   - **Solution**: Set your Gemini API key as an environment variable or in `.env` file
+
+3. **Dependencies Missing**:
+   - **Error**: `ModuleNotFoundError: No module named 'flask'`
+   - **Solution**: Run `pip install -r requirements.txt`
+
+### **Common Runtime Issues**
+
+1. **Frontend Can't Connect to Backend**:
+   - **Error**: `net::ERR_CONNECTION_REFUSED`
+   - **Solution**: Ensure Flask backend is running on port 5000
+
+2. **Model Loading Errors**:
+   - **Error**: Issues with model inference
+   - **Solution**: Verify `best_logreg_tfidf.joblib` is in the correct location
 
 ## 🔒 **Security & Privacy**
 
