@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Shield, 
   Zap, 
@@ -14,7 +14,13 @@ import {
   Download,
   RefreshCw,
   AlertCircle,
-  Loader2
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Copy,
+  RotateCcw,
+  LogOut
 } from 'lucide-react';
 
 type Step = 'landing' | 'email-form' | 'otp-verification' | 'email-analysis';
@@ -24,12 +30,119 @@ interface FormData {
   otp: string;
 }
 
+interface EmailAnalysisResult {
+  original_email: string;
+  spam_score: number;
+  is_spam: boolean;
+  recommendation: string;
+  refinement: {
+    success: boolean;
+    refined_email: string | null;
+    refined_spam_score: number | null;
+    attempts: number;
+    final_score: number | null;
+    error?: string;
+  };
+}
+
+interface UserSession {
+  email: string;
+  sessionToken: string;
+  expiresAt: number;
+}
+
 function App() {
   const [currentStep, setCurrentStep] = useState<Step>('landing');
   const [formData, setFormData] = useState<FormData>({ email: '', otp: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [generatedOTP, setGeneratedOTP] = useState('');
+  
+  // Email analysis state
+  const [emailContent, setEmailContent] = useState('');
+  const [analysisResult, setAnalysisResult] = useState<EmailAnalysisResult | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Session management
+  const [userSession, setUserSession] = useState<UserSession | null>(null);
+
+  // Check for existing session on component mount
+  useEffect(() => {
+    checkExistingSession();
+  }, []);
+
+  // Check session expiry every minute
+  useEffect(() => {
+    if (userSession) {
+      const interval = setInterval(() => {
+        const now = Date.now();
+        const timeUntilExpiry = userSession.expiresAt - now;
+        
+        // Show warning 1 hour before expiry
+        if (timeUntilExpiry < 60 * 60 * 1000 && timeUntilExpiry > 0) {
+          // You could show a toast notification here
+          console.log('Session expires in less than 1 hour');
+        }
+        
+        // Auto-logout when session expires
+        if (timeUntilExpiry <= 0) {
+          logout();
+        }
+      }, 60000); // Check every minute
+      
+      return () => clearInterval(interval);
+    }
+  }, [userSession]);
+
+  const checkExistingSession = () => {
+    const savedSession = localStorage.getItem('spamguard_session');
+    if (savedSession) {
+      try {
+        const session: UserSession = JSON.parse(savedSession);
+        const now = Date.now();
+        
+        if (session.expiresAt > now) {
+          // Session is still valid
+          setUserSession(session);
+          setFormData({ ...formData, email: session.email });
+          setCurrentStep('email-analysis');
+        } else {
+          // Session expired, remove it
+          localStorage.removeItem('spamguard_session');
+        }
+      } catch (e) {
+        // Invalid session data, remove it
+        localStorage.removeItem('spamguard_session');
+      }
+    }
+  };
+
+  const createUserSession = (email: string) => {
+    const session: UserSession = {
+      email,
+      sessionToken: generateSessionToken(),
+      expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+    };
+    
+    setUserSession(session);
+    localStorage.setItem('spamguard_session', JSON.stringify(session));
+  };
+
+  const generateSessionToken = (): string => {
+    return Math.random().toString(36).substring(2) + Date.now().toString(36);
+  };
+
+  const logout = () => {
+    setUserSession(null);
+    localStorage.removeItem('spamguard_session');
+    setCurrentStep('landing');
+    setFormData({ email: '', otp: '' });
+    setGeneratedOTP('');
+    setError('');
+    setEmailContent('');
+    setAnalysisResult(null);
+  };
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -78,12 +191,149 @@ function App() {
     // Simulate verification delay
     setTimeout(() => {
       setLoading(false);
+      // Create user session after successful verification
+      createUserSession(formData.email);
       setCurrentStep('email-analysis');
     }, 1000);
   };
 
   const handleAnalyzeClick = () => {
-    setCurrentStep('email-form');
+    if (userSession) {
+      // User already has a valid session, go directly to analysis
+      setCurrentStep('email-analysis');
+    } else {
+      // User needs to verify, go to email form
+      setCurrentStep('email-form');
+    }
+  };
+
+  const analyzeEmail = async () => {
+    if (!emailContent.trim()) {
+      setError('Please enter email content to analyze');
+      return;
+    }
+
+    setAnalyzing(true);
+    setError('');
+    setAnalysisResult(null);
+
+    try {
+      const response = await fetch('http://localhost:5000/api/analyze-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email_content: emailContent.trim()
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to analyze email');
+      }
+
+      const result = await response.json();
+      setAnalysisResult(result);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to analyze email');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const refineEmail = async () => {
+    if (!emailContent.trim()) return;
+
+    setAnalyzing(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:5000/api/refine-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email_content: emailContent.trim(),
+          original_spam_score: analysisResult?.spam_score
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to refine email');
+      }
+
+      const result = await response.json();
+      
+      // Update the analysis result with refinement data
+      if (analysisResult) {
+        setAnalysisResult({
+          ...analysisResult,
+          refinement: {
+            success: true,
+            refined_email: result.refined_email,
+            refined_spam_score: result.refined_spam_score,
+            attempts: result.attempts || 0,
+            final_score: result.final_score || null
+          }
+        });
+      }
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to refine email');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const getRecommendationColor = (recommendation: string) => {
+    switch (recommendation) {
+      case 'accept':
+      case 'accept_refined':
+        return 'text-green-600 bg-green-100';
+      case 'rewrite':
+        return 'text-orange-600 bg-orange-100';
+      case 'still_risky':
+        return 'text-red-600 bg-red-100';
+      default:
+        return 'text-gray-600 bg-gray-100';
+    }
+  };
+
+  const getRecommendationText = (recommendation: string) => {
+    switch (recommendation) {
+      case 'accept':
+        return 'Email is safe to send';
+      case 'accept_refined':
+        return 'Email refined and now safe to send';
+      case 'rewrite':
+        return 'Email needs refinement';
+      case 'still_risky':
+        return 'Email still risky after refinement';
+      default:
+        return 'Analysis complete';
+    }
+  };
+
+  const getSpamScoreColor = (score: number) => {
+    if (score < 30) return 'text-green-600';
+    if (score < 60) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const getSpamScoreBackground = (score: number) => {
+    if (score < 30) return 'bg-green-100';
+    if (score < 60) return 'bg-yellow-100';
+    return 'bg-red-100';
   };
 
   const renderEmailForm = () => (
@@ -226,35 +476,278 @@ function App() {
   );
 
   const renderEmailAnalysis = () => (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-4">
-      <div className="max-w-4xl w-full bg-white rounded-2xl shadow-xl p-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-4 py-8">
+      <div className="max-w-6xl w-full bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-2 mb-4">
             <Shield className="h-8 w-8 text-blue-600" />
             <span className="text-2xl font-bold text-gray-900">SpamGuard Pro</span>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Email Analysis Dashboard</h2>
-          <p className="text-gray-600">Welcome! You now have access to our AI-powered email analysis tools.</p>
+          <p className="text-gray-600">AI-powered email analysis and automatic refinement</p>
+          {userSession && (
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-4">
+              <div className="inline-flex items-center space-x-2 bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm">
+                <CheckCircle className="h-4 w-4" />
+                <span>Logged in as {userSession.email}</span>
+              </div>
+              <div className="text-xs text-gray-500">
+                Session expires in {Math.max(0, Math.floor((userSession.expiresAt - Date.now()) / (1000 * 60 * 60)))}h {Math.max(0, Math.floor(((userSession.expiresAt - Date.now()) % (1000 * 60 * 60)) / (1000 * 60)))}m
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
-          <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Paste Your Email Content</h3>
-            <textarea
-              className="w-full h-40 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              placeholder="Paste your email content here for analysis..."
-            />
-            <button className="w-full mt-4 bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-              Analyze Email
-            </button>
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center space-x-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              <span>{error}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Email Input Section */}
+          <div className="space-y-6">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                <Mail className="h-5 w-5 text-blue-600" />
+                <span>Email Content</span>
+              </h3>
+              <textarea
+                value={emailContent}
+                onChange={(e) => setEmailContent(e.target.value)}
+                className="w-full h-48 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                placeholder="Paste your email content here for analysis..."
+                disabled={analyzing}
+              />
+              <div className="flex space-x-3 mt-4">
+                <button 
+                  onClick={analyzeEmail}
+                  disabled={analyzing || !emailContent.trim()}
+                  className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  {analyzing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Analyzing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <BarChart3 className="h-4 w-4" />
+                      <span>Analyze Email</span>
+                    </>
+                  )}
+                </button>
+                {emailContent.trim() && (
+                  <button
+                    onClick={() => setEmailContent('')}
+                    className="px-4 py-3 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            {analysisResult && (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-medium text-gray-900 mb-3">Quick Actions</h4>
+                <div className="space-y-2">
+                  {analysisResult.refinement.success && analysisResult.refinement.refined_email && (
+                    <button
+                      onClick={() => setEmailContent(analysisResult.refinement.refined_email!)}
+                      className="w-full text-left p-3 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-700">Use Refined Email</span>
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      </div>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => copyToClipboard(emailContent)}
+                    className="w-full text-left p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-700">Copy Original</span>
+                      <Copy className="h-4 w-4 text-gray-500" />
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="bg-white border-2 border-gray-200 p-6 rounded-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Analysis Results</h3>
-            <div className="text-center text-gray-500 py-8">
-              <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p>Paste your email content and click "Analyze Email" to see results</p>
-            </div>
+          {/* Analysis Results Section */}
+          <div className="space-y-6">
+            {!analysisResult ? (
+              <div className="bg-white border-2 border-dashed border-gray-200 p-8 rounded-xl text-center">
+                <BarChart3 className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Ready for Analysis</h3>
+                <p className="text-gray-500">Paste your email content and click "Analyze Email" to see detailed results</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Spam Score Card */}
+                <div className="bg-white border border-gray-200 p-6 rounded-xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Spam Score</h3>
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getRecommendationColor(analysisResult.recommendation)}`}>
+                      {getRecommendationText(analysisResult.recommendation)}
+                    </div>
+                  </div>
+                  
+                  <div className="text-center mb-4">
+                    <div className={`text-4xl font-bold ${getSpamScoreColor(analysisResult.spam_score)}`}>
+                      {analysisResult.spam_score}%
+                    </div>
+                    <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getSpamScoreBackground(analysisResult.spam_score)} ${getSpamScoreColor(analysisResult.spam_score)}`}>
+                      {analysisResult.spam_score < 30 ? 'Low Risk' : analysisResult.spam_score < 60 ? 'Medium Risk' : 'High Risk'}
+                    </div>
+                  </div>
+
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-500 ${
+                        analysisResult.spam_score < 30 ? 'bg-green-500' : 
+                        analysisResult.spam_score < 60 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${Math.min(analysisResult.spam_score, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Refinement Results */}
+                {analysisResult.refinement.success && analysisResult.refinement.refined_email && (
+                  <div className="bg-white border border-gray-200 p-6 rounded-xl">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                        <Sparkles className="h-5 w-5 text-blue-600" />
+                        <span>AI Refinement</span>
+                      </h3>
+                      <div className="flex items-center space-x-3">
+                        {analysisResult.refinement.attempts > 0 && (
+                          <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                            {analysisResult.refinement.attempts} attempt{analysisResult.refinement.attempts > 1 ? 's' : ''}
+                          </div>
+                        )}
+                        {analysisResult.refinement.final_score && (
+                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            analysisResult.refinement.final_score < 60 ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'
+                          }`}>
+                          {analysisResult.refinement.final_score < 60 ? 'Safe to Send' : 'Still Risky'}
+                        </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Refinement Progress */}
+                    {analysisResult.refinement.attempts > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-blue-700 font-medium">Refinement Progress:</span>
+                          <span className="text-blue-600">
+                            {analysisResult.refinement.attempts} attempt{analysisResult.refinement.attempts > 1 ? 's' : ''} completed
+                          </span>
+                        </div>
+                        {analysisResult.refinement.final_score && (
+                          <div className="mt-2 text-xs text-blue-600">
+                            Final score: {analysisResult.refinement.final_score}% 
+                            {analysisResult.refinement.final_score < 60 ? ' ✅ Safe' : ' ⚠️ Still needs work'}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                      <div className="text-sm text-gray-600 mb-2">Refined Email:</div>
+                      <div className="text-gray-900 whitespace-pre-wrap">{analysisResult.refinement.refined_email}</div>
+                    </div>
+
+                    {analysisResult.refinement.refined_spam_score && (
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-600">
+                          New spam score: <span className={`font-medium ${getSpamScoreColor(analysisResult.refinement.refined_spam_score)}`}>
+                            {analysisResult.refinement.refined_spam_score}%
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => copyToClipboard(analysisResult.refinement.refined_email!)}
+                          className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                        >
+                          <Copy className="h-3 w-3" />
+                          <span>Copy</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Manual Refinement Button */}
+                {analysisResult.spam_score >= 60 && !analysisResult.refinement.success && (
+                  <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <AlertTriangle className="h-5 w-5 text-orange-600" />
+                      <span className="font-medium text-orange-800">High Spam Risk Detected</span>
+                    </div>
+                    <p className="text-orange-700 text-sm mb-3">
+                      Your email has a high spam probability. Use AI refinement to improve deliverability.
+                    </p>
+                    <button
+                      onClick={refineEmail}
+                      disabled={analyzing}
+                      className="w-full bg-orange-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    >
+                      {analyzing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Refining...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          <span>Refine with AI</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Manual Override for Persistent High Scores */}
+                {analysisResult.refinement.success && analysisResult.refinement.final_score && analysisResult.refinement.final_score >= 60 && (
+                  <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                      <span className="font-medium text-yellow-800">AI Refinement Limit Reached</span>
+                    </div>
+                    <p className="text-yellow-700 text-sm mb-3">
+                      The AI has refined your email {analysisResult.refinement.attempts} times, but the spam score remains high ({analysisResult.refinement.final_score}%). 
+                      You can manually edit the refined version or use it as-is if you believe it's legitimate.
+                    </p>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setEmailContent(analysisResult.refinement.refined_email!)}
+                        className="flex-1 bg-yellow-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-yellow-700 transition-colors flex items-center justify-center space-x-2"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        <span>Edit Refined Version</span>
+                      </button>
+                      <button
+                        onClick={() => copyToClipboard(analysisResult.refinement.refined_email!)}
+                        className="px-4 py-2 border border-yellow-300 text-yellow-700 rounded-lg hover:bg-yellow-100 transition-colors flex items-center space-x-2"
+                      >
+                        <Copy className="h-4 w-4" />
+                        <span>Copy</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -262,8 +755,8 @@ function App() {
           <button
             onClick={() => {
               setCurrentStep('landing');
-              setFormData({ email: '', otp: '' });
-              setGeneratedOTP('');
+              setEmailContent('');
+              setAnalysisResult(null);
               setError('');
             }}
             className="text-gray-600 hover:text-gray-900 transition-colors"
@@ -297,12 +790,28 @@ function App() {
               <Shield className="h-8 w-8 text-blue-600" />
               <span className="text-2xl font-bold text-gray-900">SpamGuard Pro</span>
             </div>
-            <button 
-              onClick={handleAnalyzeClick}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-            >
-              Analyze your Email
-            </button>
+            <div className="flex items-center space-x-4">
+              {userSession ? (
+                <div className="flex items-center space-x-3">
+                  <div className="text-sm text-gray-600">
+                    Welcome back, <span className="font-medium text-gray-900">{userSession.email}</span>
+                  </div>
+                  <button 
+                    onClick={logout}
+                    className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              ) : null}
+              <button 
+                onClick={handleAnalyzeClick}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
+                {userSession ? 'Analyze Email' : 'Get Started'}
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -331,9 +840,18 @@ function App() {
                 onClick={handleAnalyzeClick}
                 className="bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center group"
               >
-                Transform Your Emails Now
+                {userSession ? 'Continue Analyzing Emails' : 'Transform Your Emails Now'}
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </button>
+              {userSession && (
+                <button 
+                  onClick={logout}
+                  className="px-6 py-4 border border-gray-300 text-gray-700 rounded-xl font-semibold text-lg hover:bg-gray-50 transition-all duration-300 flex items-center space-x-2"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span>Switch Account</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

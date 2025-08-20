@@ -29,6 +29,8 @@ class EmailAnalysisResult:
     spam_probability: float
     refined_email: Optional[str] = None
     refinement_success: bool = False
+    refinement_attempts: int = 0
+    final_spam_probability: Optional[float] = None
     error_message: Optional[str] = None
 
 class SpamDetector:
@@ -37,7 +39,7 @@ class SpamDetector:
     Loads and uses pre-trained TF-IDF + Logistic Regression model
     """
     
-    def __init__(self, model_path: str = "tfidf_lr.joblib"):
+    def __init__(self, model_path: str = "best_logreg_tfidf.joblib"):
         """
         Initialize the spam detector
         
@@ -45,39 +47,23 @@ class SpamDetector:
             model_path (str): Path to the saved joblib model file
         """
         self.model_path = model_path
-        self.model = None
-        self.vectorizer = None
+        self.pipeline = None
         self._load_model()
     
     def _load_model(self) -> None:
-        """Load the pre-trained model and vectorizer from joblib file"""
+        """Load the pre-trained model from joblib file"""
         try:
             if not os.path.exists(self.model_path):
                 raise FileNotFoundError(f"Model file not found: {self.model_path}")
             
-            # Load the saved model (assumes it contains both vectorizer and classifier)
-            model_data = joblib.load(self.model_path)
+            # Load the saved model
+            self.pipeline = joblib.load(self.model_path)
             
-            # Handle different model storage formats
-            if isinstance(model_data, dict):
-                self.vectorizer = model_data.get('vectorizer')
-                self.model = model_data.get('classifier')
-            elif hasattr(model_data, 'named_steps'):
-                # Pipeline format
-                self.vectorizer = model_data.named_steps.get('tfidf', model_data.named_steps.get('vectorizer'))
-                self.model = model_data.named_steps.get('classifier', model_data.named_steps.get('lr'))
+            if hasattr(self.pipeline, 'named_steps'):
+                logger.info(f"Successfully loaded Pipeline model from {self.model_path}")
+                logger.info(f"Pipeline steps: {list(self.pipeline.named_steps.keys())}")
             else:
-                # Assume it's just the classifier, create default vectorizer
-                self.model = model_data
-                self.vectorizer = TfidfVectorizer(
-                    max_features=5000,
-                    stop_words='english',
-                    lowercase=True,
-                    ngram_range=(1, 2)
-                )
-                logger.warning("No vectorizer found in model file. Using default TfidfVectorizer.")
-            
-            logger.info(f"Successfully loaded model from {self.model_path}")
+                logger.warning("Model is not a Pipeline, this may cause issues")
             
         except Exception as e:
             logger.error(f"Failed to load model: {str(e)}")
@@ -113,30 +99,23 @@ class SpamDetector:
             Tuple[bool, float]: (is_spam, spam_probability)
         """
         try:
-            if not self.model or not self.vectorizer:
-                raise ValueError("Model not properly loaded")
+            if not self.pipeline:
+                raise ValueError("Pipeline model not properly loaded")
             
             # Preprocess the email
             processed_text = self.preprocess_email(email_text)
             
-            # Vectorize the text
-            if hasattr(self.vectorizer, 'transform'):
-                # Vectorizer is already fitted
-                text_vector = self.vectorizer.transform([processed_text])
-            else:
-                # Need to fit the vectorizer (shouldn't happen with pre-trained model)
-                logger.warning("Vectorizer not fitted. This may cause issues.")
-                text_vector = self.vectorizer.fit_transform([processed_text])
-            
-            # Get prediction probability
-            if hasattr(self.model, 'predict_proba'):
-                spam_prob = self.model.predict_proba(text_vector)[0][1]  # Probability of spam class
+            # Use the pipeline directly for prediction
+            if hasattr(self.pipeline, 'predict_proba'):
+                spam_prob = self.pipeline.predict_proba([processed_text])[0][1]  # Probability of spam class
             else:
                 # Fallback to binary prediction
-                prediction = self.model.predict(text_vector)[0]
+                prediction = self.pipeline.predict([processed_text])[0]
                 spam_prob = float(prediction)
             
-            is_spam = spam_prob > 0.5
+            # Convert numpy types to Python native types for JSON serialization
+            is_spam = bool(spam_prob > 0.5)  # Convert numpy.bool_ to Python bool
+            spam_prob = float(spam_prob)      # Convert numpy.float64 to Python float
             
             logger.info(f"Email classified - Spam probability: {spam_prob:.3f}, Is spam: {is_spam}")
             return is_spam, spam_prob
@@ -199,20 +178,24 @@ class GeminiEmailRefiner:
             str: Refined, legitimate email content
         """
         prompt = f"""
-You are an expert email writer. I need you to transform the following email content, which has been flagged as potential spam, into a professional, legitimate email that would pass spam filters.
+You are an expert email writer specializing in converting spam emails into professional, legitimate communications. Your goal is to create an email that will pass spam filters and appear trustworthy.
 
-Requirements:
-1. Maintain the core message and intent if it's legitimate
-2. Remove any spam-like language, excessive capitalization, or suspicious elements
-3. Use professional, clear, and concise language
-4. Ensure proper email structure and formatting
-5. Make it sound natural and trustworthy
-6. Remove any misleading or deceptive content
+CRITICAL ANTI-SPAM REQUIREMENTS:
+1. REMOVE ALL CAPS, excessive exclamation marks, and urgent language
+2. ELIMINATE words like: "URGENT", "LIMITED TIME", "ACT NOW", "GUARANTEED", "FREE", "WIN", "PRIZE", "MONEY", "CLICK HERE"
+3. REPLACE promotional language with professional, factual statements
+4. REMOVE any claims about quick results, miracle solutions, or unbelievable offers
+5. USE proper business email format with clear subject line
+6. WRITE in a calm, professional tone without pressure tactics
+7. FOCUS on providing information rather than selling
+8. REMOVE any suspicious URLs or links to external sites
+9. USE proper grammar, punctuation, and business language
+10. MAKE the email sound like it's from a legitimate company
 
-Original email content:
+Original spam email content:
 {spam_email}
 
-Please provide only the refined email content without any explanations or additional text:
+Transform this into a professional, legitimate email that would pass spam filters. Provide only the refined email content:
 """
         
         for attempt in range(max_retries):
@@ -236,13 +219,135 @@ Please provide only the refined email content without any explanations or additi
                     raise
         
         raise Exception(f"Failed to refine email after {max_retries} attempts")
+    
+    def refine_spam_email_aggressive(self, spam_email: str, max_retries: int = 3) -> str:
+        """More aggressive refinement approach"""
+        prompt = f"""
+You are an expert at removing ALL spam indicators from emails. This email needs AGGRESSIVE cleaning to pass spam filters.
+
+AGGRESSIVE ANTI-SPAM REQUIREMENTS:
+1. COMPLETELY REMOVE: All promotional language, sales pitches, urgency, guarantees
+2. REPLACE with: Factual, informational content only
+3. REMOVE: Any mention of prices, offers, deals, or commercial intent
+4. FOCUS on: Providing information, education, or professional communication
+5. TONE: Academic, professional, or informational - NOT commercial
+6. STRUCTURE: Formal business email format
+
+Original email:
+{spam_email}
+
+Transform this into a completely non-commercial, informational email:
+"""
+        
+        for attempt in range(max_retries):
+            try:
+                self._rate_limit()
+                response = self.model.generate_content(prompt)
+                refined_email = response.text.strip()
+                
+                if refined_email and len(refined_email) > 10:
+                    logger.info(f"Successfully refined email aggressively (attempt {attempt + 1})")
+                    return refined_email
+                else:
+                    logger.warning(f"Received empty response (attempt {attempt + 1})")
+                    
+            except Exception as e:
+                logger.error(f"Gemini API error (attempt {attempt + 1}): {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                else:
+                    raise
+        
+        raise Exception(f"Failed to refine email aggressively after {max_retries} attempts")
+    
+    def refine_spam_email_rewrite(self, spam_email: str, max_retries: int = 3) -> str:
+        """Complete rewrite with different approach"""
+        prompt = f"""
+You are rewriting this email from scratch to make it completely legitimate and professional.
+
+COMPLETE REWRITE REQUIREMENTS:
+1. IGNORE the original content - start fresh
+2. CREATE a professional business email about the same topic
+3. USE formal business language and structure
+4. REMOVE all commercial intent and promotional language
+5. FOCUS on providing value and information
+6. WRITE as if from a legitimate, established company
+7. USE proper email format with clear subject and professional signature
+
+Original email (ignore content, just use topic):
+{spam_email}
+
+Create a completely new, professional email about the same topic:
+"""
+        
+        for attempt in range(max_retries):
+            try:
+                self._rate_limit()
+                response = self.model.generate_content(prompt)
+                refined_email = response.text.strip()
+                
+                if refined_email and len(refined_email) > 10:
+                    logger.info(f"Successfully rewrote email (attempt {attempt + 1})")
+                    return refined_email
+                else:
+                    logger.warning(f"Received empty response (attempt {attempt + 1})")
+                    
+            except Exception as e:
+                logger.error(f"Gemini API error (attempt {attempt + 1}): {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                else:
+                    raise
+        
+        raise Exception(f"Failed to rewrite email after {max_retries} attempts")
+    
+    def refine_spam_email_conservative(self, spam_email: str, max_retries: int = 3) -> str:
+        """Ultra-conservative approach for final attempts"""
+        prompt = f"""
+You are creating the MOST conservative, professional email possible to ensure it passes all spam filters.
+
+ULTRA-CONSERVATIVE REQUIREMENTS:
+1. USE only the most formal, academic, or corporate language
+2. REMOVE any hint of commercial activity or sales
+3. WRITE as if from a government agency, university, or major corporation
+4. FOCUS on information sharing, not any form of transaction
+5. USE proper business letter format
+6. AVOID any modern marketing language or casual tone
+7. MAKE it sound like official correspondence
+
+Original email:
+{spam_email}
+
+Create the most conservative, formal email possible:
+"""
+        
+        for attempt in range(max_retries):
+            try:
+                self._rate_limit()
+                response = self.model.generate_content(prompt)
+                refined_email = response.text.strip()
+                
+                if refined_email and len(refined_email) > 10:
+                    logger.info(f"Successfully created conservative email (attempt {attempt + 1})")
+                    return refined_email
+                else:
+                    logger.warning(f"Received empty response (attempt {attempt + 1})")
+                    
+            except Exception as e:
+                logger.error(f"Gemini API error (attempt {attempt + 1}): {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                else:
+                    raise
+        
+        raise Exception(f"Failed to create conservative email after {max_retries} attempts")
 
 class EmailFilteringSystem:
     """
     Main system that combines spam detection with AI refinement
     """
     
-    def __init__(self, model_path: str = "tfidf_lr.joblib", gemini_api_key: Optional[str] = None):
+    def __init__(self, model_path: str = "best_logreg_tfidf.joblib", gemini_api_key: Optional[str] = None):
         """
         Initialize the complete email filtering system
         
@@ -254,13 +359,14 @@ class EmailFilteringSystem:
         self.email_refiner = GeminiEmailRefiner(gemini_api_key)
         logger.info("Email filtering system initialized successfully")
     
-    def process_email(self, email_content: str, refine_threshold: float = 0.5) -> EmailAnalysisResult:
+    def process_email(self, email_content: str, refine_threshold: float = 0.5, max_refinement_attempts: int = 5) -> EmailAnalysisResult:
         """
-        Complete email processing pipeline
+        Complete email processing pipeline with iterative refinement
         
         Args:
             email_content (str): Original email content
-            refine_threshold (float): Spam probability threshold for refinement
+            refine_threshold (float): Spam probability threshold for refinement (0.6 = 60%)
+            max_refinement_attempts (int): Maximum number of refinement attempts
             
         Returns:
             EmailAnalysisResult: Complete analysis and refinement results
@@ -268,26 +374,85 @@ class EmailFilteringSystem:
         result = EmailAnalysisResult(original_email=email_content, is_spam=False, spam_probability=0.0)
         
         try:
-            # Step 1: Classify email
-            logger.info("Classifying email...")
+            # Step 1: Classify original email
+            logger.info("Classifying original email...")
             is_spam, spam_prob = self.spam_detector.classify_email(email_content)
             
-            result.is_spam = is_spam
-            result.spam_probability = spam_prob
+            # Ensure Python native types for JSON serialization
+            result.is_spam = bool(is_spam)           # Ensure Python bool
+            result.spam_probability = float(spam_prob)  # Ensure Python float
             
-            # Step 2: Refine if spam probability exceeds threshold
+            logger.info(f"Original email spam probability: {spam_prob:.3f}")
+            
+            # Step 2: Iterative refinement if spam probability exceeds threshold
             if spam_prob >= refine_threshold:
-                logger.info(f"Email spam probability ({spam_prob:.3f}) exceeds threshold ({refine_threshold}). Refining...")
+                logger.info(f"Email spam probability ({spam_prob:.3f}) exceeds threshold ({refine_threshold}). Starting iterative refinement...")
                 
-                try:
-                    refined_email = self.email_refiner.refine_spam_email(email_content)
-                    result.refined_email = refined_email
-                    result.refinement_success = True
-                    logger.info("Email successfully refined")
+                current_email = email_content
+                current_spam_prob = spam_prob
+                refinement_attempts = 0
+                
+                while current_spam_prob >= refine_threshold and refinement_attempts < max_refinement_attempts:
+                    refinement_attempts += 1
+                    logger.info(f"Refinement attempt {refinement_attempts}/{max_refinement_attempts}")
                     
-                except Exception as e:
-                    result.error_message = f"Refinement failed: {str(e)}"
-                    logger.error(f"Failed to refine email: {str(e)}")
+                    try:
+                        # Adaptive refinement strategy
+                        if refinement_attempts == 1:
+                            # First attempt: Standard refinement
+                            refined_email = self.email_refiner.refine_spam_email(current_email)
+                        elif refinement_attempts == 2:
+                            # Second attempt: More aggressive refinement
+                            refined_email = self.email_refiner.refine_spam_email_aggressive(current_email)
+                        elif refinement_attempts == 3:
+                            # Third attempt: Complete rewrite with different approach
+                            refined_email = self.email_refiner.refine_spam_email_rewrite(current_email)
+                        else:
+                            # Final attempts: Ultra-conservative approach
+                            refined_email = self.email_refiner.refine_spam_email_conservative(current_email)
+                        
+                        # Check the new spam score
+                        refined_is_spam, refined_spam_prob = self.spam_detector.classify_email(refined_email)
+                        refined_spam_prob = float(refined_spam_prob)  # Ensure Python float
+                        
+                        logger.info(f"Refinement {refinement_attempts}: Spam probability reduced from {current_spam_prob:.3f} to {refined_spam_prob:.3f}")
+                        
+                        # Update current values for next iteration
+                        current_email = refined_email
+                        current_spam_prob = refined_spam_prob
+                        
+                        # If we've achieved a safe score, break early
+                        if refined_spam_prob < refine_threshold:
+                            logger.info(f"✅ Email successfully refined to safe level: {refined_spam_prob:.3f} < {refine_threshold}")
+                            break
+                        
+                        # If we've made significant improvement (reduced by 30% or more), accept it
+                        improvement_ratio = (spam_prob - refined_spam_prob) / spam_prob
+                        if improvement_ratio >= 0.3 and refined_spam_prob < 0.8:
+                            logger.info(f"✅ Email significantly improved by {improvement_ratio:.1%}. Accepting with score {refined_spam_prob:.3f}")
+                            break
+                            
+                        # If no improvement after 2 attempts, try a different strategy
+                        if refinement_attempts >= 2 and refined_spam_prob >= current_spam_prob:
+                            logger.warning(f"No improvement detected. Trying alternative approach...")
+                            
+                    except Exception as e:
+                        logger.error(f"Refinement attempt {refinement_attempts} failed: {str(e)}")
+                        break
+                
+                # Store the final refined result
+                if refinement_attempts > 0 and current_spam_prob < spam_prob:
+                    result.refined_email = current_email
+                    result.refinement_success = True
+                    result.refinement_attempts = refinement_attempts
+                    result.final_spam_probability = current_spam_prob
+                    logger.info(f"Final refinement result: {current_spam_prob:.3f} (reduced from {spam_prob:.3f}) after {refinement_attempts} attempts")
+                else:
+                    result.error_message = f"Refinement failed after {refinement_attempts} attempts. Final score: {current_spam_prob:.3f}"
+                    result.refinement_attempts = refinement_attempts
+                    result.final_spam_probability = current_spam_prob
+                    logger.warning(f"Refinement unsuccessful. Final spam probability: {current_spam_prob:.3f}")
+                    
             else:
                 logger.info(f"Email spam probability ({spam_prob:.3f}) below threshold. No refinement needed.")
             
@@ -431,7 +596,7 @@ def main():
             print(f"\n📧 EMAIL {i}:")
             print(f"Original: {email.strip()[:100]}...")
             
-            result = system.process_email(email, refine_threshold=0.3)
+            result = system.process_email(email, refine_threshold=0.6)
             
             print(f"🎯 Spam Probability: {result.spam_probability:.3f}")
             print(f"🚨 Is Spam: {result.is_spam}")
