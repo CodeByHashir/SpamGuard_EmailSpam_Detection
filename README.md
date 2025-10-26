@@ -1,34 +1,34 @@
-# 🛡️ SpamGuard Pro - AI-Powered Email Spam Detection & Refinement
+# SpamGuard Pro - AI-Powered Email Spam Detection and Refinement
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/Flask-2.3+-green.svg)](https://flask.palletsprojects.com/)
 [![React](https://img.shields.io/badge/React-18+-blue.svg)](https://reactjs.org/)
 [![Gemini AI](https://img.shields.io/badge/Gemini-1.5%20Flash-orange.svg)](https://ai.google.dev/gemini)
 
-> **Transform risky emails into professional, spam-free communications using advanced AI technology**
+> Transform risky emails into clear, professional communications using AI-driven detection and refinement.
 
-## 🌟 **Features**
+## Features
 
-### ✨ **Core Capabilities**
-- **🤖 AI-Powered Spam Detection**: Custom-trained ML model with 98%+ accuracy
-- **🔄 Iterative Email Refinement**: Gemini AI automatically rewrites emails until they're safe
-- **📊 Real-time Analysis**: Instant spam probability scoring and recommendations
-- **🎯 Smart Thresholds**: Configurable risk levels (default: 60% spam threshold)
-- **💾 Session Management**: Persistent user sessions with 24-hour validity
+### Core capabilities
+- AI-powered spam detection using a custom-trained model
+- Iterative email refinement via Gemini AI
+- Real-time spam probability scoring and recommendations
+- Configurable thresholds (default: 60% spam threshold)
+- Session management with 24-hour validity
 
-### 🚀 **Advanced Refinement System**
-- **Adaptive Strategies**: Multiple refinement approaches based on attempt number
-- **Progressive Improvement**: Tracks refinement attempts and score improvements
-- **Fallback Logic**: Accepts emails with significant improvement (30%+ reduction)
-- **Manual Override**: User control when AI reaches refinement limits
+### Advanced refinement system
+- Adaptive strategies by attempt number
+- Tracks refinement attempts and score changes
+- Fallback acceptance on significant improvement (≥30% reduction)
+- Manual override when limits are reached
 
-### 🎨 **Modern UI/UX**
-- **Responsive Design**: Works seamlessly on desktop and mobile
-- **Real-time Feedback**: Live progress indicators and status updates
-- **Professional Interface**: Clean, intuitive design with Tailwind CSS
-- **Interactive Elements**: Copy-to-clipboard, email editing, and quick actions
+### UI and UX
+- Responsive design for desktop and mobile
+- Real-time progress indicators and status updates
+- Clean interface with Tailwind CSS
+- Copy-to-clipboard, editing, and quick actions
 
-## 🏗️ **Architecture**
+## Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
@@ -49,28 +49,28 @@
                        └──────────────────┘
 ```
 
-## 🚀 **Quick Start**
+## Quick start
 
-### **Prerequisites**
+### Prerequisites
 - Python 3.8+
 - Node.js 16+
 - Gemini API key
 - **ML Model File**: `best_logreg_tfidf.joblib` (download from Google Drive)
 
-### **1. Clone the Repository**
+### 1) Clone the repository
 ```bash
 git clone https://github.com/CodeByHashir/SpamGuard_EmailSpam_Detection.git
 cd SpamGuard_EmailSpam_Detection
 ```
 
-### **2. Backend Setup**
+### 2) Backend setup
 ```bash
 # Install Python dependencies
 pip install -r requirements.txt
 
 # Download the required ML model file
 # The model file is too large for GitHub, so download it from Google Drive:
-# 📥 Download Link: https://drive.google.com/drive/folders/1Rx_DrtljDKkhYsi--69UOBXavnnxsO7-?usp=sharing
+# Download link: https://drive.google.com/drive/folders/1Rx_DrtljDKkhYsi--69UOBXavnnxsO7-?usp=sharing
 # Download "best_logreg_tfidf.joblib" and place it in the project root directory
 
 # Set your Gemini API key (IMPORTANT: Never commit your actual API key!)
@@ -85,7 +85,7 @@ cp env.example .env
 python app.py
 ```
 
-### **3. Frontend Setup**
+### 3) Frontend setup
 ```bash
 # Install Node.js dependencies
 npm install
@@ -94,52 +94,52 @@ npm install
 npm run dev
 ```
 
-### **4. Access the Application**
+### 4) Access the application
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:5000
 
-## 📥 **ML Model Requirements**
+## ML model requirements
 
-### **Important: Download Required Model File**
+### Required model file
 This project uses a custom-trained machine learning model that is too large to include in the GitHub repository.
 
-**📥 Download the Model:**
+Download the model:
 - **Google Drive Link**: [https://drive.google.com/drive/folders/1Rx_DrtljDKkhYsi--69UOBXavnnxsO7-?usp=sharing](https://drive.google.com/drive/folders/1Rx_DrtljDKkhYsi--69UOBXavnnxsO7-?usp=sharing)
 - **File to Download**: `best_logreg_tfidf.joblib`
 - **Place in**: Project root directory (same level as `app.py`)
 
-**Why This Model?**
+Why this model
 I use `best_logreg_tfidf.joblib` model for this project because it provides:
 - **98%+ accuracy** in spam detection
 - **Fast inference** for real-time email analysis
 - **Optimized performance** with TF-IDF features
 - **Proven reliability** on the Enron spam dataset
 
-**⚠️ Without this model file, the application will not work!**
+Note: Without this model file, the application will not work.
 
-## 📖 **Usage Guide**
+## Usage
 
-### **Basic Email Analysis**
+### Basic email analysis
 1. **Navigate to the Email Analysis Dashboard**
 2. **Paste your email content** in the input area
 3. **Click "Analyze Email"** to get instant results
 4. **View spam score** and recommendations
 
-### **AI Refinement Process**
+### AI refinement process
 1. **High-risk emails** (≥60% spam) automatically trigger refinement
 2. **Watch iterative improvement** in real-time
 3. **Multiple refinement strategies** are applied progressively
 4. **Final result** shows improvement metrics and refined content
 
-### **Session Management**
+### Session management
 - **First visit**: Complete email verification (OTP)
 - **Return visits**: Direct access to analysis dashboard
 - **24-hour sessions**: Automatic logout after expiry
 - **Secure storage**: Local session management
 
-## 🔧 **Configuration**
+## Configuration
 
-### **Environment Variables**
+### Environment variables
 ```bash
 # Required
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -149,7 +149,7 @@ PORT=5000                    # Backend port
 FLASK_ENV=development        # Flask environment
 ```
 
-### **Model Configuration**
+### Model configuration
 ```python
 # In spam_detector.py
 REFINE_THRESHOLD = 0.6       # 60% spam threshold
@@ -157,14 +157,14 @@ MAX_REFINEMENT_ATTEMPTS = 5  # Maximum refinement attempts
 IMPROVEMENT_RATIO = 0.3      # 30% improvement acceptance
 ```
 
-### **API Endpoints**
+### API endpoints
 ```bash
 GET  /api/health           # Health check
 POST /api/analyze-email    # Email analysis
 POST /api/refine-email     # Manual refinement
 ```
 
-## 🧪 **Testing Examples**
+## Testing examples
 
 ### **High-Risk Spam Email**
 ```
@@ -184,7 +184,7 @@ Only $99.99 for a 3-month supply
 Order NOW before supplies run out!
 ```
 
-**Expected Result**: 
+Expected result:
 - Initial spam score: 85-95%
 - After refinement: 25-45%
 - Multiple refinement attempts with different strategies
@@ -206,31 +206,31 @@ Michael Johnson
 Senior Project Manager
 ```
 
-**Expected Result**: 
+Expected result:
 - Spam score: 10-30%
 - No refinement needed
 - Direct acceptance
 
-## 📊 **Performance Metrics**
+## Performance metrics
 
-### **Model Accuracy**
+### Model accuracy
 - **Spam Detection**: 98.4% accuracy
 - **False Positive Rate**: <1.5%
 - **False Negative Rate**: <1.8%
 
-### **Refinement Effectiveness**
+### Refinement effectiveness
 - **Average Improvement**: 45-65% spam score reduction
 - **Success Rate**: 92% of emails refined to safe levels
 - **Processing Time**: <3 seconds per refinement attempt
 
-### **System Performance**
+### System performance
 - **API Response Time**: <500ms
 - **Concurrent Users**: 100+ simultaneous sessions
 - **Uptime**: 99.9% availability
 
-## 🛠️ **Development**
+## Development
 
-### **Project Structure**
+### Project structure
 ```
 SpamGuard_EmailSpam_Detection/
 ├── app.py                 # Flask backend server
@@ -243,26 +243,26 @@ SpamGuard_EmailSpam_Detection/
 └── README.md             # This file
 ```
 
-**⚠️ Note**: `best_logreg_tfidf.joblib` is not included in the repository due to size limitations. 
+Note: `best_logreg_tfidf.joblib` is not included in the repository due to size limitations.
 Download it from the [Google Drive link](#ml-model-requirements) above.
 
-### **Key Technologies**
+### Key technologies
 - **Backend**: Flask, Python, scikit-learn
 - **Frontend**: React, TypeScript, Tailwind CSS
 - **AI**: Google Gemini 1.5 Flash API
 - **ML**: Custom TF-IDF + Logistic Regression model
 - **Database**: Local session storage (localStorage)
 
-### **Contributing**
+### Contributing
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 🚨 **Troubleshooting**
+## Troubleshooting
 
-### **Common Setup Issues**
+### Common setup issues
 
 1. **Model File Missing**:
    - **Error**: `FileNotFoundError: Model file not found: best_logreg_tfidf.joblib`
@@ -277,7 +277,7 @@ Download it from the [Google Drive link](#ml-model-requirements) above.
    - **Error**: `ModuleNotFoundError: No module named 'flask'`
    - **Solution**: Run `pip install -r requirements.txt`
 
-### **Common Runtime Issues**
+### Common runtime issues
 
 1. **Frontend Can't Connect to Backend**:
    - **Error**: `net::ERR_CONNECTION_REFUSED`
@@ -287,10 +287,10 @@ Download it from the [Google Drive link](#ml-model-requirements) above.
    - **Error**: Issues with model inference
    - **Solution**: Verify `best_logreg_tfidf.joblib` is in the correct location
 
-## 🔒 **Security & Privacy**
+## Security and privacy
 
-### **API Key Security**
-⚠️ **IMPORTANT**: Never commit your actual API keys to Git!
+### API key security
+Important: Never commit actual API keys to Git.
 
 1. **Use Environment Variables**:
    ```bash
@@ -308,60 +308,60 @@ Download it from the [Google Drive link](#ml-model-requirements) above.
    - Railway: Variables tab
    - Render: Environment section
 
-### **Security Best Practices**
-- ✅ API keys are stored in environment variables
-- ✅ `.env` files are excluded from Git (in .gitignore)
-- ✅ No hardcoded secrets in source code
-- ✅ Secure session management
-- ✅ Input validation and sanitization
+### Security best practices
+- API keys are stored in environment variables
+- `.env` files are excluded from Git (in .gitignore)
+- No hardcoded secrets in source code
+- Secure session management
+- Input validation and sanitization
 
-### **Data Protection**
+### Data protection
 - **No email storage**: Emails are processed in-memory only
 - **Secure API**: CORS-enabled with proper authentication
 - **Session security**: Encrypted session tokens
 - **API rate limiting**: Prevents abuse and ensures fair usage
 
-### **Privacy Compliance**
+### Privacy compliance
 - **GDPR Ready**: No personal data retention
 - **Local processing**: All analysis happens on your server
 - **Secure transmission**: HTTPS encryption for all communications
 
-## 📈 **Roadmap**
+## Roadmap
 
-### **Phase 1 (Current)**
-- ✅ Core spam detection
-- ✅ AI refinement system
-- ✅ Session management
-- ✅ Responsive UI
+### Phase 1 (current)
+- Core spam detection
+- AI refinement system
+- Session management
+- Responsive UI
 
-### **Phase 2 (Next)**
-- 🔄 Bulk email processing
-- 🔄 Advanced analytics dashboard
-- 🔄 Custom model training
-- 🔄 API rate limiting
+### Phase 2 (next)
+- Bulk email processing
+- Advanced analytics dashboard
+- Custom model training
+- API rate limiting
 
-### **Phase 3 (Future)**
-- 📊 Machine learning insights
-- 📊 Integration with email clients
-- 📊 Multi-language support
-- 📊 Enterprise features
+### Phase 3 (future)
+- Machine learning insights
+- Integration with email clients
+- Multi-language support
+- Enterprise features
 
-## 🤝 **Support & Community**
+## Support and community
 
-### **Getting Help**
+### Getting help
 - **Issues**: [GitHub Issues](https://github.com/CodeByHashir/SpamGuard_EmailSpam_Detection/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/CodeByHashir/SpamGuard_EmailSpam_Detection/discussions)
 - **Wiki**: [Project Wiki](https://github.com/CodeByHashir/SpamGuard_EmailSpam_Detection/wiki)
 
-### **Contributors**
+### Contributors
 - **Hashir Ahmad** - Project Lead & Full-Stack Development
 - **AI Assistant** - Code Review & Feature Implementation
 
-## 📄 **License**
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 **Acknowledgments**
+## Acknowledgments
 
 - **Google Gemini AI** for email refinement capabilities
 - **scikit-learn** for machine learning infrastructure
@@ -372,11 +372,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Made with ❤️ by Hashir Ahmad**
+Maintained by Hashir Ahmad
 
 [![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/CodeByHashir)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/your-profile)
 
-**⭐ Star this repository if you found it helpful! ⭐**
+If you find this project useful, consider starring the repository.
 
 </div>
